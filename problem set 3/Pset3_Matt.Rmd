@@ -1,0 +1,150 @@
+---
+title: "PSet 3_Matt"
+author: "Matt Easton"
+date: "3/10/2022"
+output: pdf_document
+---
+
+# Problem Set 3
+
+## Question 1)
+
+### Exercise 11
+
+#### Part a)
+$$E[Y_{01} - Y_{00}] = \frac{\frac{2+1}{0.25} + \frac{7+10}{0.25}}{{\frac{2}{0.25} + \frac{2}{0.25}}} - \frac{\frac{5+3+3+3}{0.5} + \frac{3+4}{0.25}}{\frac{4}{0.5} + \frac{2}{0.25}}$$
+$$E[Y_{01} - Y_{00}] = \frac{12 + 68} {8 + 8} - \frac{28 + 28}{8 + 8}$$
+$$E[Y_{01} - Y_{00}] = \frac{80} {16} - \frac{56}{16} = \frac{24}{16} = 1.5$$
+$$E[Y_{01} - Y_{00}] = 1.5$$
+This estimate is smaller than the one estimating $E[Y_{11} - Y_{00}]$ in the book. Specifically, the effect of $E[Y_{01} - Y_{00}]$ is 1.22 units smaller than $E[Y_{11} - Y_{00}]$. This difference makes logical sense, as the effect we found above it only considering the impact of the first week of running ads and does not account for the compounding (or lagged) effect that the number in the book does.
+
+#### Part b)
+$$E[Y_{11} - Y_{00}] = \frac{\frac{9+8}{0.25}}{\frac{2}{0.25}} - \frac{\frac{5+3+3+3}{0.5}}{\frac{4}{0.5}}$$
+$$E[Y_{11} - Y_{00}] = \frac{\frac{17}{0.25}}{8} - \frac{\frac{14}{0.5}}{8}$$
+$$E[Y_{11} - Y_{00}] = \frac{68}{8} - \frac{28}{8}$$
+$$E[Y_{11} - Y_{00}] = \frac{40}{8} = 5$$
+$$E[Y_{11} - Y_{00}] = 5$$
+When we restrict our calculations to only week two, we observe a larger effect than when considering the lagged effect (as found in the book). 
+
+## Question 5)
+
+```{r}
+#Bring in the data
+library(haven)
+camp1 <- read_dta("/Users/mattyeaston/Dropbox/Berkeley/Spring 2022/Methods 231B/camp1.dta")
+```
+
+### a) Run a probit model 
+```{r}
+fit <- glm(dwin ~ julyecq2 + presinc + adaaca + presinc*julyecq2, data=camp1, family = binomial(link="probit"))
+fit
+```
+
+### b) Manipulating ADAACA
+
+In order to see the estimated effect of ADAACA on the probability of a Democratic win (when holding JULYECG2 and PRESINC at their respective medians), we can plot the predicted probability at each incremental value of ADAACA.
+
+We can observe the effect of ADAACA in the plot below. We can also interpret the impact of ADAACA by considering the change in DWIN from one unit of ADAACA to the next. For example, a change in ADAACA from 3 to 4 results in a 0.0013 increase in the probability of a Democratic win. 
+
+Consider the plot below for a full understanding of how manipulating ADAACA (when holding JULYECQ2 and PRESINC at their respective median) on the probability of a Democratic win.
+
+```{r}
+#Step one: Find the medians to hold constant
+median(camp1$julyecq2) #1.08
+median(camp1$presinc) #0
+
+#Decide what interval to manipulate adaaca on
+summary(camp1$adaaca) #let's do 0.5!
+
+#Create a new data frame to insert into regression and predict values
+median_camp <- data.frame(julyecq2 = 1.08,
+                          presinc = 0,
+                          adaaca = c(-100:100, 0.5)) #including the smallest and largest value of adaaca
+
+#Now, predict values using our probit regression model and put it in data frame
+median_camp$prob <- predict(fit, newdata = median_camp, data = camp1, type = "response")
+
+#Let's try making a plot with our predictions
+library(ggplot2)
+
+a <- ggplot(median_camp, aes(x = adaaca,
+                        y = prob)) +
+  geom_line() +
+  stat_smooth(method="glm", method.args=list(family=binomial(link="probit"))) +
+  labs(x='ADAACA (liberalism index)', y='Probability of Winning', title='Probability of Winning by ADAACA Score') +
+  theme_bw(base_size = 13)
+
+print(a)
+
+```
+
+### c) Plotting the Predicted Value
+
+```{r}
+# CREATE FOUR DATA FRAMES TO USE FOR PREDICT
+cond1 <- data.frame(julyecq2 = 1.5,
+                    presinc = 1,
+                    adaaca = c(-100:100, 0.5))
+
+cond2 <- data.frame(julyecq2 = 1.5,
+                    presinc = 0,
+                    adaaca = c(-100:100, 0.5))
+
+cond3 <- data.frame(julyecq2 = -1.5,
+                    presinc = 1,
+                    adaaca = c(-100:100, 0.5))
+
+cond4 <- data.frame(julyecq2 = -1.5,
+                    presinc = 0,
+                    adaaca = c(-100:100, 0.5))
+
+#PREDICT DWIN PROBABILITY AND ADD TO ONE DATA FRAME
+cond1$prob1 <- predict(fit, newdata = cond1, data = camp1, type = "response")
+cond1$prob2 <- predict(fit, newdata = cond2, data = camp1, type = "response")
+cond1$prob3 <- predict(fit, newdata = cond3, data = camp1, type = "response")
+cond1$prob4 <- predict(fit, newdata = cond4, data = camp1, type = "response")
+
+#CREATE TWO PLOTS ####
+#Plot 1: Cond1 and Cond3
+odd <- ggplot(cond1, aes(x = adaaca,
+                        y = prob)) +
+      geom_line(aes(y = prob1), color = "darkgreen") +
+      geom_text(x = -75, y = .63, label = "High Growth", color = "darkgreen") +
+      geom_line(aes(y = prob3), color = "darkred") +
+      geom_text(x = 50, y = .36, label = "Low Growth", color = "darkred") +
+      labs(x='ADAACA (liberalism index)', y='Probability of Winning',
+           title='Probability of Winning Among Incumbent Democrats') +
+      theme_bw(base_size = 13)
+
+#Plot 1: Cond2 and Cond4
+even <- ggplot(cond1, aes(x = adaaca,
+                        y = prob)) +
+      geom_line(aes(y = prob2), color = "darkgreen") +
+      geom_text(x = -18, y = .35, label = "High Growth", color = "darkgreen") +
+      geom_line(aes(y = prob4), color = "darkred") +
+      geom_text(x = 25, y = .31, label = "Low Growth", color = "darkred") +
+      labs(x='ADAACA (liberalism index)', y='Probability of Winning',
+           title='Probability of Winning With No Incumbent') +
+      theme_bw(base_size = 13)
+```
+
+Below is our plot comparing the effect of ADAACA on DWIN among Democratic incumbents, split by high growth compared to low growth.
+
+```{r}
+print(odd)
+```
+As we can see in this graphic, the predicted probability of Democratic incumbents winning increases as ADAACA score increases, both during times of high economic growth and low economic growth. However, there is a clear advantage for Democratic candidates during a period of high growth when compared to a period of low growth. Even with an ADAACA score of -100, there is an approximately 0.5 percentage point boost in probability of winning during high growth compared to low growth. Indeed, even with an incredible ADAACA score of 100, a Democratic incumbent has a less-than-half chance of being re-elected. 
+
+Substantively, we can see that these outcomes support the theory of retrospective voting; namely, that voters assess the recent state of the economy as an indicator of whether the current incumbent has done a good job or not. When the economy "looks good", voters reward the incumbent by re-electing them. However, when the economy "looks bad", the voters blame the incumbent and punish the politician by voting for the opponent. 
+
+Overall, it's clear that the economy makes a large difference in the probability of DWIN among Democratic incumbents.
+
+
+Next is our plot comparing the effect of ADAACA on DWIN when there is no incumbent running, split by high growth compared to low growth.
+
+```{r}
+print(even)
+```
+Similar to the first plot, we observe a positive boost in DWIN during times of high economic growth compared to times of low growth. However, the impact of winning during a period of high growth is much more understated for non-incumbents than for Democratic incumbents. During both periods of high growth and low growth, the probability of winning increases as ADAACA index improves; for non-incumbents, this rate appears to be roughly similar during both economic periods.
+
+Substantively, we should expect the impact of high growth to be much more understated among non-incumbents than Democratic incumbents. This is likely due to the fact that non-incumbents were not in office previously and therefore are not to blame for the state of the economy, no matter if it's good or bad. The slight advantage non-incumbents have during periods of high growth might be due to promises that non-incumbents can make to "keep the economy growing" or at least to "maintain the strength". Voters may be feeling more hopeful during periods of high growth than low growth, which may be why non-incumbents could garner more support and increase their likelihood of winning their respective election. 
