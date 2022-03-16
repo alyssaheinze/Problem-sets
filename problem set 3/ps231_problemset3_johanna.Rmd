@@ -7,32 +7,99 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
 ```
 
 # 1
-After reading Gerber and Green Chapter 8, complete
-• Exercise 1, (a)-(d) on p. 283. Note that the reference to section 8.4 in (b) should refer to section 8.2 or 8.3.
+
+## Exercise 1
+
+### (a)
+The expression Y_{i}(d) = Y{i}(d) conveys the non-interference assumption because it assumes that the potential outcome of unit $i$ only depends on itself, meaning that its only dependent on the treatment it receives.
+
+### (b)
+Experiments that involve possible spatial spillover effects are said to involve “implicit” clustered assignment because their treatment effects have to be calculated according to their exposure to the spillovers, meaning their probability of being treated plus the probability that adjacent units are treated as well. As such, the calculation of spillover treatment effects follows the same logic of clustered assignment, as neighboring units are affected in clusters by the same spillover effects.
+
+
+### (c)
+Within-subjects design might violate the non-interference assumption because the timing of the intervention might coincide with trends in the data (unique to the same unit) that are unrelated to the treatment itself but affect the outcome. For example, a person's choice in period 1 may affect their response to treatment. Additionally, if there is a spillover of treatment effects between periods for any units, the no persistence assumption may be violated. Further, if a subject's current potential outcomes change in anticipation of future treatment receipt, the no-anticipation assumption may be violated. 
+
+
+### (d)
+The attractive properties of a waitlist (or stepped-wedge) design include (1) being able to track treatment effects among several subjects over time; (2) not having to fully withhold treatment from units assigned to a control group, since every subject is eventually treated; (3) being able to draw statistically significant results from a small sample size. 
+
 
 #2
 Consider an experimental sample of groups with three units each. Half of all units are assigned to treatment at random. Suppose a model where there is spillover within groups but not across groups. Specifically, if any individual in a group receives treatment, the spillover effect is spread equally among members of the same group.
 
-(a) Define the set of all potential outcomes involved in this set up.
+##(a) Define the set of all potential outcomes involved in this set up.
 
 For each group of 3 units, potential outcomes depend on whether at least one of the units in each group is assigned to treatment. The probability that each unit is assigned to treatment is 0.5, and the probability that at least 1 units in each group is assigned to treatment is 1- p(none assigned to treatment)= $1-(.5)^{3}$= 0.875.
 
-For each group j, the potential outcome of unit i = $Y_{i_{[0,1],[0,1][0,1]}}$. $Y_{}(1,0,1)$.Each set of potential outcomes [0,1] refers to whether each unit in group j is assigned to treatment or control. 
+For each unit, we have nine potential outcomes: $Y_{000}$,
+$Y_{100}$, $Y_{001}$, $Y_{111}$, $Y_{010}$, $Y_{101}$, $Y_{110}$,  and $Y_{011}$, $Y_{010}$, where the first subscript refers to whether the unit itself is treated, the second subscript refers to whether the second unit in the same group is treated, and the third subscript refers to whether the third unit in that group is treated. 
 
-To calculate an unbiased estimator of the treatment effect, we must weight each unit by the inverse of its probability of assignment to different treatments. We use:
+##(b) Define the direct and spillover effects under the potential outcomes framework.
 
-$\frac
+The direct effects refer simply to an ATE calculation, which computes the difference between the average treatment effect among all the treated units and the average treatment effect among all the untreated units, regardless of any possible spillovers in their group. In this case, the direct effects under the potential outcomes framework ignore the treatment assignment of units in the same group, such that for each unit, the potential outcome equals $Y(1)$ if its treated and $Y(0)$ if it is untreated. Under this set up, these potential outcomes correspond with the $Y_{100}$ potential outcome for a unit that is treated and the $Y_{000}$ potential outcome for a unit that is untreated.
+
+The spillover effects would then be defined by the other spillover conditions specified above to include those for which at least one of the units in each group is treated {$Y_{001}$, $Y_{111}$, $Y_{010}$, $Y_{101}$, $Y_{110}$,  and $Y_{011}$, $Y_{010}$}, compared to those groups where no unit is treated,$Y_{000}$. 
+
+##(c) Using the data set data_spillover.RDS provided on bCourses, estimate the direct and spillover effects.
+
+To calculate the direct effect, we can assume that there are no spillovers and simply calculate the difference between the average treatment effect among the treated units and the average treatment effect among the untreated units.  
 
 ```{r}
-spill_dt <- readRDS()
+setwd("C:/Users/hanna/Documents/GitHub/ProblemSets/problem set 3")
+dt <- readRDS("data_spillover.RDS")
+
+#Set diff in means function
+diff_means <- function(outcome, treatment){ 
+  # Mean outcome for treated units
+  Yt <- mean(outcome[treatment==1], na.rm=TRUE)
+  # Mean outcome for control units
+  Yc <- mean(outcome[treatment==0], na.rm=TRUE)
+  # Difference in mean outcomes
+  ate_hat <- Yt - Yc
+  
+  # Calculating number of observations
+  N <- length(na.omit(outcome))
+  
+  # Preparing output
+  res <- c(Yt, Yc, ate_hat)
+  names(res) <- c("Mean Treated", "Mean Control", "Difference")
+  
+  return(res)
+}
+
+Y <- dt$Y
+Z <- dt$Z
+
+diff_means(Y,Z)
 ```
 
+The direct effects equal 0.84, which corresponds to the difference between the mean outcome for those treated units and the mean outcome for those untreated units, regardless of their group assignment. 
 
-(b) Define the direct and spillover effects under the potential outcomes framework.
+To calculate an unbiased estimator of the treatment effect, we can compare several groups. Since the probability of assigning each unit to treatment is the same (0.5), and likewise, the probability that each group is assigned to the spillover condition is the same (0.875), we do not need to account for propensity weights. We can thus simply compare units in groups with at least one treated unit (spillover condition), to those with no treated units (control condition).
 
-(c) Using the data set data_spillover.RDS provided on bCourses, estimate the direct and spillover effects.
+```{r}
+#filter data to include spillover vs control condition
 
-(d) Should we use inverse propensity weights in this setting? Why / why not?
+dt_spill <- dt %>%
+group_by(G) %>%
+mutate(any(Z==1))
+
+dt_spill$spillover <- dt_spill[,5]==TRUE
+
+dt_spill$spillover [dt_spill$spillover == "TRUE"] <- 1
+
+diff_means(Y,spillover)
+
+```
+
+In this case, when we account for the groups where there are spillover presents and compare to those where no unit is assigned to treatment, we observe a lower average treatment effect of 0.54. 
+
+## (d) Should we use inverse propensity weights in this setting? Why / whynot?
+
+In this case, since the probability of assignment to the treatment and spillover conditions is the same for each unit, regardless of the group, the inverse probability weights are irelevant and thus innecessary because they would cancel out. 
